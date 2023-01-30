@@ -54,29 +54,35 @@ for i in $TARGETARCH; do
 		esac
 		GCC="$HOSTARCH-gcc"
 	fi
-	$initpwd/configure  --with-protocols="bfd bgp pipe static" --enable-ipv6=yes --enable-client=no --enable-pthreads=yes --with-sysconfig=linux-v6 --build=$ARCH --host=$HOSTARCH --runstatedir=/var/run/calico
-	make
-	# Remove the dynamic binaries and rerun make to create static binaries and store off the results
-	rm bird birdcl
+#	$initpwd/configure  --with-protocols="bfd bgp pipe static" --enable-debug --enable-ipv6=yes --enable-client=no --enable-pthreads=yes --with-sysconfig=linux-v6 --build=$ARCH --host=$HOSTARCH --runstatedir=/var/run/calico
+#	make -j8 SHELL='/bin/bash -x'
+#	# Remove the dynamic binaries and rerun make to create static binaries and store off the results
+#	rm bird birdcl
+#
+#	# we need to force static compilation
+#	# because of the circular dependency when bird runs in its own directory (birdc -> ./birdc), it will try to rebuild birdc, which fails when static
+#	#    thus, always build explicit targets when doing --static
+#	make -j8 SHELL='/bin/bash -x' CC="$GCC --static" bird birdcl
+#	cp bird $distarch/bird6
+#	cp birdcl $distarch/birdcl6
+#
+#
+#	# Rerun the build but without IPv6 (or the client) and store off the result.
+#	make clean
 
-	# we need to force static compilation
-	# because of the circular dependency when bird runs in its own directory (birdc -> ./birdc), it will try to rebuild birdc, which fails when static
-	#    thus, always build explicit targets when doing --static
-	make CC="$GCC --static" bird birdcl
-	cp bird $distarch/bird6
-	cp birdcl $distarch/birdcl6
-
-
-	# Rerun the build but without IPv6 (or the client) and store off the result.
+  if [ x"$1" == x"fast" ]; then
+    :
+  else
+	$initpwd/configure  --with-protocols="bfd bgp pipe static" --enable-debug --enable-client=no --enable-pthreads=yes -with-sysconfig=linux --build=$ARCH --host=$HOSTARCH --runstatedir=/var/run/calico
 	make clean
-	$initpwd/configure  --with-protocols="bfd bgp pipe static" --enable-client=no --enable-pthreads=yes -with-sysconfig=linux --build=$ARCH --host=$HOSTARCH --runstatedir=/var/run/calico
-	make
-	rm bird birdcl
+	fi
+
+	make -j8 SHELL='/bin/bash -x'
+	rm -f bird
 	# because of the circular dependency when bird runs in its own directory (birdc -> ./birdc), it will try to rebuild birdc, which fails when static
 	#    thus, always build explicit targets when doing --static
-	make CC="$GCC --static" bird birdcl
+	make -j8 SHELL='/bin/bash -x' CC="$GCC --static" bird
 	cp bird $distarch/bird
-	cp birdcl $distarch/birdcl
 	)
 
 done

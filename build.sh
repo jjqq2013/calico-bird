@@ -85,4 +85,4 @@ mkdir -p $DIST
 #    ARCH = architecture on which I am running
 #    TARGETARCH = architecture(s) for which I am building, if different than ARCH (blank if the same) 
 #    DIST = root directory in which to put binaries, structured as $DIST/$TARGETARCH
-docker run --rm --name bird-build -e ARCH=$BUILDARCH -e TARGETARCH="$TARGETARCH" -e DIST=$DIST -e OBJ=$OBJ -v `pwd`:/code $IMAGE ./create_binaries.sh
+docker run -it -e ARCH=$BUILDARCH -e TARGETARCH="$TARGETARCH" -e DIST=$DIST -e OBJ=$OBJ -v `pwd`:/code $IMAGE bash #./create_binaries.sh
