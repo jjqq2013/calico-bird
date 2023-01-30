@@ -554,8 +554,21 @@ nl_parse_multipath(struct krt_proto *p, struct rtattr *ra, int af)
 	  if (!ng || (ng->scope == SCOPE_HOST))
 	    return NULL;
 	}
-      else
-	return NULL;
+      else {
+	//return NULL;
+        // This happens when the IPv6 multiplath route uses IPv6 link-local address.
+        // e.g.,
+        // 10.0.0.0/24 nhid 24 proto bgp src 100.117.134.89 metric 20
+        //         nexthop via inet6 fe80::920a:84ff:fe7e:f16c dev ens3f1.1037 weight 1
+        //         nexthop via inet6 fe80::920a:84ff:fe7e:db6c dev ens3f0.1037 weight 1
+        // Actually we should pull upstream source code
+        // (https://github.com/CZ-NIC/bird/blob/master/sysdep/linux/netlink.c)
+        // which read info from RTA_VIA (Gateway in different AF)
+        // (see https://man7.org/linux/man-pages/man7/rtnetlink.7.html)
+        // Since this modification is just to make the Calico network works,
+        // we are not interested on the multipath handling, so just continue.
+        memset(&rv->gw, 0, sizeof(rv->gw));
+      }
 
       len -= NLMSG_ALIGN(nh->rtnh_len);
       nh = RTNH_NEXT(nh);
@@ -1054,7 +1067,21 @@ dest:
       break;
     case RTD_MULTIPATH:
       r->r.rtm_type = RTN_UNICAST;
-      nl_add_multipath(&r->h, rsize, a->nexthops);
+      if ( ipa_zero(gw) &&
+          (ea = ea_find(eattrs, EA_KRT_TUNNEL)) &&
+          (nh = ea_find(eattrs, EA_CODE(EAP_BGP, BA_NEXT_HOP))) &&
+          (i = if_find_by_name(ea->u.ptr->data)))
+      {
+        /*
+         * Tunnel attribute is set, so set the route up using the specified tunnel device
+         * to the originator of the route.
+         */
+        nl_add_attr_u32(&r->h, rsize, RTA_OIF, i->index);
+        nl_add_attr_ipa(&r->h, rsize, RTA_GATEWAY, *(ip_addr *)(nh->u.ptr->data));
+        r->r.rtm_flags |= RTNH_F_ONLINK;
+      } else {
+        nl_add_multipath(&r->h, rsize, a->nexthops);
+      }
       break;
     case RTD_NONE:
       break;
